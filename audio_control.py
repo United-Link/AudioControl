@@ -152,7 +152,7 @@ def check_containers():
         return False, None
 
 
-@app.route("/check_status", methods=["POST"])
+# @app.route("/check_status", methods=["POST"])
 def check_status() -> tuple:
     status = {}
 
@@ -238,7 +238,7 @@ def check_status() -> tuple:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-@app.route("/restart", methods=["POST"])
+# @app.route("/restart", methods=["POST"])
 def restart_docker_compose():
     if not check_device_exists():
         return jsonify({"error": "TEAC Corp. US-2x2HR device not found"}), 400
