@@ -1,10 +1,11 @@
-from flask import Flask, request, jsonify
+# from flask import Flask, request, jsonify
 import subprocess
 import re
 import os
-from gevent import pywsgi
 
-app = Flask(__name__)
+# from gevent import pywsgi
+
+# app = Flask(__name__)
 
 
 compose_file = (
