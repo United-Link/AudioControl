@@ -312,4 +312,6 @@ if __name__ == "__main__":
     # server = pywsgi.WSGIServer(("0.0.0.0", 5000), app)
     # server.serve_forever()
     #
-    print(check_device_exists())
+    print(f"check_device_exists: {check_device_exists()}")
+    print(f"check_default_audio_devices: {check_default_audio_devices()}")
+    print(f"check_volume_levels: {check_volume_levels()}")
