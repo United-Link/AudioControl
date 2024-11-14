@@ -52,49 +52,27 @@ def query_default_audio_devices():
         return default_source, default_sink
 
 
-def query_volume_levels(source, sink):
-    """檢查預設裝置的音量是否都是 100%"""
-    source_level = None
-    sink_level = None
-
+def set_volume_levels(device):
     try:
-        sink_volume = subprocess.run(
-            ["pactl", "get-sink-volume", sink],
+        subprocess.run(
+            ["pactl", "set-sink-volume", device, "100"],
             capture_output=True,
             text=True,
             check=True,
-        ).stdout
-        source_volume = subprocess.run(
-            ["pactl", "get-source-volume", source],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-
-        sink_level = (
-            int(re.search(r"(\d+)%", sink_volume).group(1))
-            if re.search(r"(\d+)%", sink_volume)
-            else None
         )
-        source_level = (
-            int(re.search(r"(\d+)%", source_volume).group(1))
-            if re.search(r"(\d+)%", source_volume)
-            else None
-        )
+        return True
 
-        return source_level, sink_level
     except (
         subprocess.CalledProcessError,
         AttributeError,
         ValueError,
     ):  # 處理錯誤或找不到數值
-        return source_level, sink_level
+        return False
 
 
-def check_containers():
-    """檢查 audio_api 和 audio_enh 容器的狀態"""
+def check_audio_api():
     try:
-        audio_api_status = subprocess.run(
+        status = subprocess.run(
             [
                 "docker",
                 "ps",
@@ -108,6 +86,16 @@ def check_containers():
             text=True,
             check=True,
         ).stdout.strip()
+
+        if "Up" not in status:
+            return False
+
+    except subprocess.CalledProcessError:
+        return False
+
+
+def check_audio_enh():
+    try:
         audio_enh_status = subprocess.run(
             [
                 "docker",
@@ -123,7 +111,7 @@ def check_containers():
             check=True,
         ).stdout.strip()
 
-        if "Up" not in audio_api_status or "Up" not in audio_enh_status:
+        if "Up" not in audio_enh_status:
             return False, None
 
         # 如果 audio_enh 正在運行，提取 COMMAND 參數
@@ -316,7 +304,14 @@ if __name__ == "__main__":
     print(f"check_device_exists: {check_device_exists()}")
 
     default_source, default_sink = query_default_audio_devices()
-    if default_source is not None and default_sink is not None:
-        print(f"Default source: {default_source}, Default sink: {default_sink}")
-        source_level, sink_level = query_volume_levels(default_source, default_sink)
-        print(f"Source level: {source_level}, Sink level: {sink_level}")
+    if default_source is not None:
+        set_volume_levels(default_source)
+    if default_sink is not None:
+        set_volume_levels(default_sink)
+
+    if check_audio_api():
+        print("audio_api is running")
+
+    status, param = check_audio_enh()
+    if status:
+        print(f"audio_enh is running with $LIMIT={param}")
