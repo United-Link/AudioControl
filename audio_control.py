@@ -61,11 +61,8 @@ def set_volume_levels(device):
         )
         return True
 
-    except (
-        subprocess.CalledProcessError,
-        AttributeError,
-        ValueError,
-    ):  # 處理錯誤或找不到數值
+    except subprocess.CalledProcessError as e:
+        print(e.stderr)
         return False
 
 
@@ -156,7 +153,7 @@ def get_audio_status():
         status["device"] = True
         default_source, default_sink = query_default_audio_devices()
         if default_source is not None:
-            print(set_volume_levels(default_source))
+            print(default_source)
             if set_volume_levels(default_source):
                 status["source"] = True
             else:
