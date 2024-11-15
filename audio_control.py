@@ -1,11 +1,11 @@
-# from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify
 import subprocess
 import re
 import os
 
-# from gevent import pywsgi
+from gevent import pywsgi
 
-# app = Flask(__name__)
+app = Flask(__name__)
 
 
 COMPOSE_FILE = "/mnt/audio/NorthAudio/space/run_dfn_n_vol.yaml"
@@ -68,7 +68,7 @@ def set_volume_levels(device):
         return False
 
 
-def check_audio_api():
+def check_audio_vol():
     try:
         status = subprocess.run(
             [
@@ -139,212 +139,171 @@ def check_audio_enh():
         return False, None
 
 
-# @app.route("/check_status", methods=["POST"])
-def check_status() -> tuple:
-    status = {}
+@app.route("/get_status", methods=["POST"])
+def get_status():
+    status = {
+        "device": False,
+        "source": False,
+        "sink": False,
+        "audio_vol": False,
+        "audio_enh": False,
+        "limit": None,
+    }
 
-    status["device_exists"] = False
+    pre_flag = True
     if check_device_exists():
-        status["device_exists"] = True
+        status["device"] = True
+        default_source, default_sink = query_default_audio_devices()
+        if default_source is not None:
+            if set_volume_levels(default_source):
+                status["source"] = True
+            else:
+                pre_flag = False
+        else:
+            pre_flag = False
 
-        # return jsonify({"error": "TEAC Corp. US-2x2HR device not found"}), 400
+        if default_sink is not None:
+            if set_volume_levels(default_sink):
+                status["sink"] = False
+            else:
+                pre_flag = False
+        else:
+            pre_flag = False
+    else:
+        pre_flag = False
 
-    status["default_device"] = "System"
-    if check_default_audio_devices():
-        status["default_device"] = "TASCAM_US-2x2HR"
-    #     status["default_device"] = False
-    #     return jsonify({"error": "Default audio devices are not set correctly"}), 400
-    # else:
-    #     s
+    if pre_flag:
+        audio_vol_status = check_audio_vol()
+        if audio_vol_status:
+            status["audio_vol"] = True
 
-    status["volume_100%"] = False
-    if check_volume_levels():
-        status["volume_100%"] = True
+        audio_enh_status, limit = check_audio_enh()
+        if audio_enh_status:
+            status["audio_enh"] = True
+            status["limit"] = limit
 
-    containers_running, parameter = check_containers()
-
-    if not containers_running:
-        return jsonify({"error": "Containers are not running"}), 400
-
-    limit = request.json.get("limit")
-    compose_file_api = request.json.get("compose_file")
-
-    if not limit:
-        return jsonify({"error": "--limit parameter is required"}), 400
-
-    if compose_file_api:  # 如果 API 請求中提供了 compose 檔案路徑，則覆蓋預設值
-        compose_file = compose_file_api
-
-    if not compose_file or not os.path.exists(compose_file):
-        return jsonify({"error": "Compose file not found"}), 400
-
-    try:
-        # 停止 docker compose
-        subprocess.run(
-            ["docker", "compose", "-f", compose_file, "down"],
-            check=True,
-            capture_output=True,
-        )
-
-        # 啟動 docker compose with new limit
-        subprocess.run(
-            [
-                "LIMIT=" + str(limit),
-                "docker",
-                "compose",
-                "-f",
-                compose_file,
-                "up",
-                "-d",
-            ],
-            check=True,
-            capture_output=True,
-        )
-
-        return (
-            jsonify(
-                {
-                    "message": f"Docker Compose restarted with LIMIT={limit} and file={compose_file}"
-                }
-            ),
-            200,
-        )
-
-    except subprocess.CalledProcessError as e:
-        return (
-            jsonify(
-                {
-                    "error": f"Error restarting Docker Compose: {e.stderr.decode()}",
-                    "returncode": e.returncode,
-                }
-            ),
-            500,
-        )
-
-    except Exception as e:  # 捕捉其他潛在的錯誤，例如檔案不存在
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+    return jsonify(status)
 
 
 # @app.route("/restart", methods=["POST"])
-def restart_docker_compose():
-    if not check_device_exists():
-        return jsonify({"error": "TEAC Corp. US-2x2HR device not found"}), 400
+# def restart_docker_compose():
+#     if not check_device_exists():
+#         return jsonify({"error": "TEAC Corp. US-2x2HR device not found"}), 400
 
-    if not check_default_audio_devices():
-        return jsonify({"error": "Default audio devices are not set correctly"}), 400
+#     if not check_default_audio_devices():
+#         return jsonify({"error": "Default audio devices are not set correctly"}), 400
 
-    if not check_volume_levels():
-        return jsonify({"error": "Volume levels are not at 100%"}), 400
+#     if not check_volume_levels():
+#         return jsonify({"error": "Volume levels are not at 100%"}), 400
 
-    limit = request.json.get("limit")
-    compose_file_api = request.json.get("compose_file")
+#     limit = request.json.get("limit")
+#     compose_file_api = request.json.get("compose_file")
 
-    if not limit:
-        return jsonify({"error": "--limit parameter is required"}), 400
+#     if not limit:
+#         return jsonify({"error": "--limit parameter is required"}), 400
 
-    if compose_file_api:  # 如果 API 請求中提供了 compose 檔案路徑，則覆蓋預設值
-        compose_file = compose_file_api
+#     if compose_file_api:  # 如果 API 請求中提供了 compose 檔案路徑，則覆蓋預設值
+#         compose_file = compose_file_api
 
-    if not compose_file or not os.path.exists(compose_file):
-        return jsonify({"error": "Compose file not found"}), 400
+#     if not compose_file or not os.path.exists(compose_file):
+#         return jsonify({"error": "Compose file not found"}), 400
 
-    try:
-        # 停止 docker compose
-        subprocess.run(
-            ["docker", "compose", "-f", compose_file, "down"],
-            check=True,
-            capture_output=True,
-        )
+#     try:
+#         # 停止 docker compose
+#         subprocess.run(
+#             ["docker", "compose", "-f", compose_file, "down"],
+#             check=True,
+#             capture_output=True,
+#         )
 
-        # 啟動 docker compose with new limit
-        subprocess.run(
-            [
-                "LIMIT=" + str(limit),
-                "docker",
-                "compose",
-                "-f",
-                compose_file,
-                "up",
-                "-d",
-            ],
-            check=True,
-            capture_output=True,
-        )
+#         # 啟動 docker compose with new limit
+#         subprocess.run(
+#             [
+#                 "LIMIT=" + str(limit),
+#                 "docker",
+#                 "compose",
+#                 "-f",
+#                 compose_file,
+#                 "up",
+#                 "-d",
+#             ],
+#             check=True,
+#             capture_output=True,
+#         )
 
-        return (
-            jsonify(
-                {
-                    "message": f"Docker Compose restarted with LIMIT={limit} and file={compose_file}"
-                }
-            ),
-            200,
-        )
+#         return (
+#             jsonify(
+#                 {
+#                     "message": f"Docker Compose restarted with LIMIT={limit} and file={compose_file}"
+#                 }
+#             ),
+#             200,
+#         )
 
-    except subprocess.CalledProcessError as e:
-        return (
-            jsonify(
-                {
-                    "error": f"Error restarting Docker Compose: {e.stderr.decode()}",
-                    "returncode": e.returncode,
-                }
-            ),
-            500,
-        )
+#     except subprocess.CalledProcessError as e:
+#         return (
+#             jsonify(
+#                 {
+#                     "error": f"Error restarting Docker Compose: {e.stderr.decode()}",
+#                     "returncode": e.returncode,
+#                 }
+#             ),
+#             500,
+#         )
 
-    except Exception as e:  # 捕捉其他潛在的錯誤，例如檔案不存在
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+#     except Exception as e:  # 捕捉其他潛在的錯誤，例如檔案不存在
+#         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
 if __name__ == "__main__":
-    # server = pywsgi.WSGIServer(("0.0.0.0", 5000), app)
-    # server.serve_forever()
-    #
+    server = pywsgi.WSGIServer(("0.0.0.0", 9527), app)
+    server.serve_forever()
 
     # Test
-    print(f"Detection of Audio Device: {check_device_exists()}")
+    # print(f"Detection of Audio Device: {check_device_exists()}")
 
-    default_source, default_sink = query_default_audio_devices()
-    if default_source is not None:
-        set_volume_levels(default_source)
-        print("Source Volume Level: 100")
-    if default_sink is not None:
-        set_volume_levels(default_sink)
-        print("Sink Volume Level: 100")
+    # default_source, default_sink = query_default_audio_devices()
+    # if default_source is not None:
+    #     set_volume_levels(default_source)
+    #     print("Source Volume Level: 100")
+    # if default_sink is not None:
+    #     set_volume_levels(default_sink)
+    #     print("Sink Volume Level: 100")
 
-    audio_api_status = check_audio_api()
-    if audio_api_status:
-        print("audio_api is running")
+    # audio_vol_status = check_audio_vol()
+    # if audio_vol_status:
+    #     print("audio_vol is running")
 
-    audio_enh_status, limit = check_audio_enh()
-    if audio_enh_status:
-        print(f"audio_enh is running with LIMIT={limit}")
+    # audio_enh_status, limit = check_audio_enh()
+    # if audio_enh_status:
+    #     print(f"audio_enh is running with LIMIT={limit}")
 
-    if audio_api_status or audio_enh_status:
-        subprocess.run(
-            ["docker", "compose", "-f", COMPOSE_FILE, "down"],
-            check=True,
-            capture_output=True,
-        )
+    # if audio_vol_status or audio_enh_status:
+    #     subprocess.run(
+    #         ["docker", "compose", "-f", COMPOSE_FILE, "down"],
+    #         check=True,
+    #         capture_output=True,
+    #     )
 
-    limit = 32
-    subprocess.run(
-        [
-            "docker",
-            "compose",
-            "-f",
-            COMPOSE_FILE,
-            "up",
-            "-d",
-        ],
-        check=True,
-        capture_output=True,
-        env={**os.environ, "LIMIT": str(limit)},
-    )
+    # limit = 32
+    # subprocess.run(
+    #     [
+    #         "docker",
+    #         "compose",
+    #         "-f",
+    #         COMPOSE_FILE,
+    #         "up",
+    #         "-d",
+    #     ],
+    #     check=True,
+    #     capture_output=True,
+    #     env={**os.environ, "LIMIT": str(limit)},
+    # )
 
-    audio_api_status = check_audio_api()
-    if audio_api_status:
-        print("audio_api is running")
+    # audio_vol_status = check_audio_vol()
+    # if audio_vol_status:
+    #     print("audio_vol is running")
 
-    audio_enh_status, limit = check_audio_enh()
-    if audio_enh_status:
-        print(f"audio_enh is running with LIMIT={limit}")
+    # audio_enh_status, limit = check_audio_enh()
+    # if audio_enh_status:
+    #     print(f"audio_enh is running with LIMIT={limit}")
