@@ -8,9 +8,7 @@ import os
 # app = Flask(__name__)
 
 
-compose_file = (
-    "/mnt/audio/NorthAudio/space/run_dfn_n_vol.yaml"  # 預設的 compose 檔案路徑
-)
+COMPOSE_FILE = "/mnt/audio/NorthAudio/space/run_dfn_n_vol.yaml"
 
 
 def check_device_exists():
@@ -301,17 +299,49 @@ if __name__ == "__main__":
     # server = pywsgi.WSGIServer(("0.0.0.0", 5000), app)
     # server.serve_forever()
     #
-    print(f"check_device_exists: {check_device_exists()}")
+
+    # Test
+    print(f"Detection of Audio Device: {check_device_exists()}")
 
     default_source, default_sink = query_default_audio_devices()
     if default_source is not None:
         set_volume_levels(default_source)
+        print("Source Volume Level: 100")
     if default_sink is not None:
         set_volume_levels(default_sink)
+        print("Sink Volume Level: 100")
 
     if check_audio_api():
         print("audio_api is running")
 
-    status, param = check_audio_enh()
-    if status:
-        print(f"audio_enh is running with $LIMIT={param}")
+    audio_enh_status, limit = check_audio_enh()
+    if audio_enh_status:
+        print(f"audio_enh is running with LIMIT={limit}")
+
+    limit = 32
+    subprocess.run(
+        ["docker", "compose", "-f", COMPOSE_FILE, "down"],
+        check=True,
+        capture_output=True,
+    )
+
+    subprocess.run(
+        [
+            "LIMIT=" + str(limit),
+            "docker",
+            "compose",
+            "-f",
+            COMPOSE_FILE,
+            "up",
+            "-d",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    if check_audio_api():
+        print("audio_api is running")
+
+    audio_enh_status, limit = check_audio_enh()
+    if audio_enh_status:
+        print(f"audio_enh is running with LIMIT={limit}")
