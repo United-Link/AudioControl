@@ -155,8 +155,8 @@ def get_audio_status():
     if check_device_exists():
         status["device"] = True
         default_source, default_sink = query_default_audio_devices()
-        print(default_source, default_sink)
         if default_source is not None:
+            print(set_volume_levels(default_source))
             if set_volume_levels(default_source):
                 status["source"] = True
             else:
