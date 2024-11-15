@@ -87,6 +87,8 @@ def check_audio_api():
 
         if "Up" not in status:
             return False
+        else:
+            return True
 
     except subprocess.CalledProcessError:
         return False
@@ -112,28 +114,26 @@ def check_audio_enh():
         if "Up" not in audio_enh_status:
             return False, None
 
-        # 如果 audio_enh 正在運行，提取 COMMAND 參數
-        if "Up" in audio_enh_status:
-            audio_enh_command = subprocess.run(
-                [
-                    "docker",
-                    "ps",
-                    "-a",
-                    "--filter",
-                    "name=audio_enh",
-                    "--format",
-                    "{{.Command}}",
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.strip()
-            match = re.search(r"bash run_dfn.sh (\d+)", audio_enh_command)
-            if match:
-                parameter = int(match.group(1))
-                return True, parameter
-
-        return True, None  # audio_enh 沒有運行或沒有找到參數
+        audio_enh_command = subprocess.run(
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                "name=audio_enh",
+                "--format",
+                "{{.Command}}",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        match = re.search(r"bash run_dfn.sh (\d+)", audio_enh_command)
+        if match:
+            parameter = int(match.group(1))
+            return True, parameter
+        else:
+            raise ValueError
 
     except subprocess.CalledProcessError:
         return False, None
@@ -311,23 +311,25 @@ if __name__ == "__main__":
         set_volume_levels(default_sink)
         print("Sink Volume Level: 100")
 
-    if check_audio_api():
+    audio_api_status = check_audio_api()
+    if audio_api_status:
         print("audio_api is running")
 
     audio_enh_status, limit = check_audio_enh()
     if audio_enh_status:
         print(f"audio_enh is running with LIMIT={limit}")
 
+    if audio_api_status or audio_enh_status:
+        subprocess.run(
+            ["docker", "compose", "-f", COMPOSE_FILE, "down"],
+            check=True,
+            capture_output=True,
+        )
+
     limit = 32
     subprocess.run(
-        ["docker", "compose", "-f", COMPOSE_FILE, "down"],
-        check=True,
-        capture_output=True,
-    )
-
-    subprocess.run(
         [
-            "LIMIT=" + str(limit),
+            f"LIMIT={limit}",
             "docker",
             "compose",
             "-f",
@@ -339,7 +341,8 @@ if __name__ == "__main__":
         capture_output=True,
     )
 
-    if check_audio_api():
+    audio_api_status = check_audio_api()
+    if audio_api_status:
         print("audio_api is running")
 
     audio_enh_status, limit = check_audio_enh()
