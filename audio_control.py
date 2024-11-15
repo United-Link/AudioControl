@@ -139,7 +139,7 @@ def check_audio_enh():
         return False, None
 
 
-@app.route("/get_status", methods=["POST"])
+@app.route("/status", methods=["GET"])
 def get_status():
     status = {
         "device": False,
