@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import subprocess
 import re
 import os
+import logging
 
 from gevent import pywsgi
 
@@ -139,8 +140,8 @@ def check_audio_enh():
         return False, None
 
 
-@app.route("/status", methods=["GET"])
-def get_status():
+@app.route("/audio_status", methods=["GET"])
+def get_audio_status():
     status = {
         "device": False,
         "source": False,
@@ -151,6 +152,7 @@ def get_status():
     }
 
     pre_flag = True
+    print(check_device_exists())
     if check_device_exists():
         status["device"] = True
         default_source, default_sink = query_default_audio_devices()
