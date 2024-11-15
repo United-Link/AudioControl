@@ -329,7 +329,6 @@ if __name__ == "__main__":
     limit = 32
     subprocess.run(
         [
-            f"LIMIT={limit}",
             "docker",
             "compose",
             "-f",
@@ -339,6 +338,7 @@ if __name__ == "__main__":
         ],
         check=True,
         capture_output=True,
+        env={**os.environ, "LIMIT": str(limit)},
     )
 
     audio_api_status = check_audio_api()
